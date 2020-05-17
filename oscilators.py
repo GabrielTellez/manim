@@ -121,20 +121,39 @@ class QuarticOscilatorSmall(QuarticOscilatorArb):
 class point_and_shadow(Dot):
     CONFIG = {
         "fill_color": RED,
-        "fill_opacity": 1,   
+        "fill_opacity": 1, 
+        'radius': 0.2,  
     }
-    # def get_x_shadow(self):
-    #     x=self.get_x()
-    #     return Dot((x,0,0))
-    # def get_y_shadow(self):
-    #     y=self.get_y()
-    #     return Dot((0,y,0))
-    # def get_x_line(self):
-    #     x,y = self.get_x(), self.get_y()
-    #     return Line((x,0,0),(x,y,0))
+    def __init__(self, point=ORIGIN, phi0=0, **kwargs):
+        if phi0 == 0:
+            self.phi_t_str='\\omega_0 t'
+        else:
+            self.phi_t_str='\\omega_0 t+\\varphi'
+        super().__init__(point=point, **kwargs)
     def get_shadows(self):
         x,y = self.get_x(), self.get_y()
-        return Dot((x,0,0)), Dot((0,y,0)),Line((x,0,0),(x,y,0)),Line((0,y,0),(x,y,0)),Line((0,0,0),(x,y,0))
+        x_p =  Dot((x,0,0), name='x_shadow', color=BLUE, radius=0.2) 
+        y_p = Dot((0,y,0), name='y_shadow', color=BLUE, radius=0.2)
+        r_v = Vector((x,y,0), name='r_vector', color=RED_A)
+        angle = r_v.get_angle()
+        if angle<0 :
+            angle=TAU+angle
+        r_arc = Arc(angle=angle, name='r_arc')
+        return (
+                x_p,
+                Line((x,0,0),(x,y,0), name='x_line', color=GREY),
+                Vector((x,0,0), name='x_vector', color=BLUE_A),
+                TextMobject('$x=A\\cos(%s)$' % (self.phi_t_str), name='x_text').next_to(x_p, direction=DOWN),
+                y_p,
+                Line((0,y,0),(x,y,0),name='y_line', color=GREY),
+                Vector((0,y,0), name='y_vector', color=BLUE_A),
+                TextMobject('$y=A\\sin(%s)$' % (self.phi_t_str), name='y_text').next_to(y_p, direction=UP),
+                Line((0,0,0),(x,y,0),name='r_line', color=RED_A),
+                r_v,
+                TextMobject('$z=Ae^{i(%s)}$' % (self.phi_t_str), name='r_text').next_to(self, direction=RIGHT),
+                r_arc,
+                TextMobject('$%s$' % (self.phi_t_str), name='r_arc_text').next_to(r_arc.get_end(), direction=RIGHT),
+                )
     
 class CircleHarmonicOscillator(GraphScene):
     CONFIG = {
@@ -145,52 +164,141 @@ class CircleHarmonicOscillator(GraphScene):
         "graph_origin": ORIGIN,
         "x_axis_width": 0.5*FRAME_WIDTH,
         "y_axis_height": 0.5*FRAME_WIDTH,
-        'update_x_shadow': True,
-        'update_x_line': False,
-        'update_y_shadow': False,
-        'update_y_line': False,
-        'update_d_line': False,
+        'show_objects_list': [
+            'x_shadow', 
+        #    'x_line',
+        #    'x_vector',
+        #    'y_shadow',
+        #    'y_line',
+        #    'y_vector',
+        #    'r_line',
+        #    'r_vector',
+        #    'r_arc',
+        #    'r_arc_text'   
+            ],
         'loops': 2,
         'run_time': 25,
-        'phi0': 0
+        'phi0': 0,
     }
 
     def construct(self):
         self.setup_axes()
-        point=point_and_shadow(self.coords_to_point(1,0))
-        x_shadow, y_shadow, x_line, y_line, d_line = point.get_shadows()
-#        x_shadow=point.get_x_shadow()
-#        x_line=point.get_x_line()
-#        y_shadow=point.get_y_shadow()
-        group=VGroup(point, x_shadow, y_shadow, x_line, y_line, d_line)
+        point=point_and_shadow(self.coords_to_point(1,0),phi0=self.phi0)
+        shadows = point.get_shadows()
+        for s in shadows:
+            s.fade(darkness=1.0)
+        group=VGroup(point, *shadows)
         r=get_norm(point.get_center())
         circle=Circle(radius=r)
         phi=ValueTracker(self.phi0)
         self.add(circle)
         self.add(group)
-    #    self.play(MoveAlongPath(point, circle))
-    #    self.play(Rotating(point,radians=loops*2*PI,about_point=ORIGIN))
+        show_objects_list=self.show_objects_list
         def update_points(group):
-            point, x_shadow, y_shadow, x_line, y_line, d_line = group
+            point, *shadows = group
             point.move_to(circle.point_from_proportion(phi.get_value()%1))
-            new_x_shadow, new_y_shadow, new_x_line, new_y_line, new_d_line = point.get_shadows()
-            if self.update_x_shadow:
-                x_shadow.become(new_x_shadow)
-            if self.update_x_line:
-                x_line.become(new_x_line)
-            if self.update_d_line:
-                d_line.become(new_d_line)
-            if self.update_y_shadow:
-                y_shadow.become(new_y_shadow)
-            if self.update_y_line:
-                y_line.become(new_y_line)
+            new_objects = point.get_shadows()
+            for obj, new_obj in zip(shadows,new_objects): 
+                if obj.name in show_objects_list:
+                    obj.become(new_obj)
+
         group.add_updater(update_points)
         self.play(phi.increment_value, self.loops, run_time=self.run_time , rate_func=linear)
 
+class CircleHarmonicOscillatorX(CircleHarmonicOscillator):
+    CONFIG = {
+        'show_objects_list': [
+            'x_shadow', 
+        #    'y_shadow',
+            'x_line',
+        #    'y_line',
+        #    'r_line'
+        ]
+    }
+
 class CircleHarmonicOscillatorXY(CircleHarmonicOscillator):
     CONFIG = {
-        'update_x_line': True,
-        'update_y_shadow': True,
-        'update_y_line': True,
-        'update_d_line': True,
+        'show_objects_list': [
+            'x_shadow', 
+            'x_line',
+            'x_vector',
+            'y_shadow',
+            'y_line',
+            'y_vector',
+            # 'r_line',
+            # 'r_vector'
+        ]
+    }
+
+class CircleHarmonicOscillatorAll(CircleHarmonicOscillator):
+    CONFIG = {
+        'show_objects_list': [
+            'x_shadow', 
+            'x_line',
+            'x_vector',
+            'x_text',
+            'y_shadow',
+            'y_line',
+            'y_vector',
+            'y_text',
+            # 'r_line',
+            'r_vector',
+            'r_text',
+            'r_arc',
+            'r_arc_text',
+        ]
+    }
+class CircleHarmonicOscillatorAllphi(CircleHarmonicOscillator):
+    CONFIG = {
+        'show_objects_list': [
+            'x_shadow', 
+            'x_line',
+            'x_vector',
+            'x_text',
+            'y_shadow',
+            'y_line',
+            'y_vector',
+            'y_text',
+            # 'r_line',
+            'r_vector',
+            'r_text',
+            'r_arc',
+            'r_arc_text',
+        ],
+        'phi0': 1.0/8.0 
+    }
+
+class CircleHarmonicOscillatorXYR(CircleHarmonicOscillator):
+    CONFIG = {
+        'show_objects_list': [
+            'x_shadow', 
+            # 'x_line',
+            'x_vector',
+            'y_shadow',
+            # 'y_line',
+            'y_vector',
+            # 'r_line',
+            'r_vector',
+        ]
+    }
+
+class CircleHarmonicOscillatorXYRA(CircleHarmonicOscillator):
+    CONFIG = {
+        'show_objects_list': [
+            'x_shadow', 
+            'x_line',
+            'x_vector',
+            'y_shadow',
+            'y_line',
+            'y_vector',
+            # 'r_line',
+            'r_vector',
+            'r_arc',
+            'r_arc_text'
+        ]
+    }
+class CircleHarmonicOscillatorNone(CircleHarmonicOscillator):
+    CONFIG = {
+        'show_objects_list': [
+        ]
     }
