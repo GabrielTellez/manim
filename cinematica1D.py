@@ -69,6 +69,8 @@ class movimiento1D(GraphScene):
         "graph_origin": (0,0,0),
         "run_time_def": 10,
         "type": "horizontal",
+        "title": "Movimiento en una dimensión",
+        "show_title": True, 
     }
     def X(self, t):
         #ts=t*self.run_time_def
@@ -85,7 +87,13 @@ class movimiento1D(GraphScene):
         else:
             raise Exception("type=%s. Movement type should be horizontal or vertical" % (self.type))
 
+    def mostrar_titulo(self, color = RED, pos=ORIGIN + 2.5 * UP):
+        titulo_mobj=TextMobject(self.title, color = color).shift(pos)
+        self.play(Write(titulo_mobj))
+
     def construct(self):
+        if self.show_title:
+            self.mostrar_titulo()
         self.setup_axes()
         if self.type == "horizontal":
             self.remove(self.y_axis_label, self.y_axis)
@@ -125,6 +133,65 @@ class movimiento1D_cubico_vert(movimiento1D):
     }
     def X(self, t):
         return Xcub(t)
+    
+def X_v_const(t):
+    ts = t * 10
+    return 0.8*ts-4.5
+
+class movimiento1D_v_const(movimiento1D):
+    CONFIG = {
+        "x_min": -5,
+        "x_max": 5,
+        "x_labeled_nums" : list(range(-5, 6, 1)),
+        "title": "Movimiento con velocidad constante",
+    }
+    def X(self, t):
+        return X_v_const(t)
+
+class movimiento1D_v_const_vert(movimiento1D_v_const):
+    CONFIG = {
+        "y_min": -5,
+        "y_max": 5,
+        "y_labeled_nums" : list(range(-5, 6, 1)),
+        "y_axis_label" : "Posición $x$ (m)",
+        "y_axis_height": 6,
+        "x_min": 0,
+        "x_max": 1,
+        "x_axis_width": 0,
+        "x_axis_label": "",
+        "type": "vertical",
+        "show_title": False,
+    }
+
+def X_a_const(t):
+    ts = t * 10
+    return 0.14*ts**2-0.8*ts-1.0
+
+class movimiento1D_a_const(movimiento1D):
+    CONFIG = {
+        "x_min": -5,
+        "x_max": 5,
+        "x_labeled_nums" : list(range(-5, 6, 1)),
+        "title": "Movimiento con aceleración constante",
+    }
+    def X(self, t):
+        return X_a_const(t)
+
+class movimiento1D_a_const_vert(movimiento1D_a_const):
+    CONFIG = {
+        "y_min": -5,
+        "y_max": 5,
+        "y_labeled_nums" : list(range(-5, 6, 1)),
+        "y_axis_label" : "Posición $x$ (m)",
+        "y_axis_height": 6,
+        "x_min": 0,
+        "x_max": 1,
+        "x_axis_width": 0,
+        "x_axis_label": "",
+        "type": "vertical",
+        "show_title": False,
+    }
+
 
 class point_and_shadow(Dot):
     CONFIG = {
@@ -176,16 +243,54 @@ class XvsT(GraphScene):
         'run_time': 10,
     }
     def X(self, t):
+        # time scale reduced to [0,1]
         #ts=t*self.run_time_def
         ts=t*1.8
         return 5*(-2.0*ts**2+3.0*ts)
+
+    def Xsc(self, t):
+        # Position rescaled to run_time
+        return self.X(t/self.run_time)
+    
+    def Vsc(self,t, dt=0.001):
+        return (self.Xsc(t+dt)-self.Xsc(t))/dt
+
+    def show_linea_tangente(self, t, dt=0.001, dt_left=-1.0, dt_right=1.0):
+        v=self.Vsc(t, dt)
+        punto_left = self.coords_to_point(t+dt_left,self.Xsc(t)+v*dt_left)
+        punto_right = self.coords_to_point(t+dt_right,self.Xsc(t)+v*dt_right)
+        linea = Line(punto_left, punto_right, color=VELOCITY_COLOR)
+        self.play(ShowCreation(linea))
+
+
     def parametric_fnct(self,t):
-        tsc=10*t
+        tsc=self.run_time*t
         x=self.X(t)
         return self.coords_to_point(tsc,x)
 
-    def construct(self):
-        self.setup_axes()
+    def show_label_x0(self, t0=0, text='$x_0$', text_shift=RIGHT + 0.02 * DOWN):
+        text_x0=TextMobject(text)
+        label_coord = self.input_to_graph_point(t0, self.fun_graph)
+        text_x0.next_to(label_coord, text_shift )
+        line = Line(label_coord + 0.2 * LEFT, label_coord + 0.2 * RIGHT)
+        self.play(Write(text_x0), ShowCreation(line))
+
+    def show_ecuacion_mov(self,titulo='Movimiento con velocidad constante $v$', text='$x(t) = v t + x_0$'):
+        titulo_mobj=TextMobject(titulo, color = RED).shift(ORIGIN + 2.5 * UP)
+        ecuacion_mobj=TextMobject(text, color = DISTANCE_COLOR ).shift(ORIGIN + 1.9 * UP)
+        self.play(Write(titulo_mobj))
+        self.play(Write(ecuacion_mobj))
+
+    def show_label_pendiente(self, text='pendiente $v$', t=4,
+                            text_shift=2.4 * RIGHT + 0.7 * DOWN,
+                            arrow_start=RIGHT + 0.8 * DOWN, arrow_end=0.1 * UP):
+        label_coord = self.input_to_graph_point(t, self.fun_graph)
+        text_mobj=TextMobject(text, color = VELOCITY_COLOR)
+        text_mobj.shift(label_coord + text_shift)
+        arrow = Arrow(label_coord + arrow_start, label_coord + arrow_end, color = VELOCITY_COLOR)
+        self.play(Write(text_mobj), ShowCreation(arrow))
+
+    def animate_graph(self):
         point = point_and_shadow(self.parametric_fnct(0),self)
         path = VMobject(color=DISTANCE_COLOR)
         path.set_points_as_corners([point.get_center(),point.get_center()+UP*0.001])
@@ -200,7 +305,7 @@ class XvsT(GraphScene):
         show_objects_list=self.show_objects_list
         def update_points(group):
             point, path, *shadows = group
-            point.move_to(spiral.point_from_proportion(phi.get_value()%1))
+            point.move_to(spiral.point_from_proportion(phi.get_value()))
             new_objects = point.get_shadows()
             for obj, new_obj in zip(shadows,new_objects): 
                 if obj.name in show_objects_list:
@@ -211,6 +316,14 @@ class XvsT(GraphScene):
             path.become(new_path)
         group.add_updater(update_points)
         self.play(phi.increment_value, 1, run_time=self.run_time , rate_func=linear)
+        self.play(*[FadeOut(s) for s in shadows])
+        self.wait(0.5)
+
+    def construct(self):
+        self.setup_axes()
+        self.fun_graph=self.get_graph(self.Xsc)
+        self.animate_graph()
+        
 
 class XvsT_cubico(XvsT):
     CONFIG = {
@@ -242,6 +355,93 @@ class XvsT_cubico(XvsT):
     }
     def X(self, t):
         return Xcub(t)
+
+class XvsT_v_const(XvsT):
+    CONFIG = {
+        "x_axis_label": "$t$",
+        "x_min": 0,
+        "x_max": 10,
+        "x_labeled_nums" : list(range(1, 11)),
+        "x_axis_label" : "Tiempo $t$ (s)",
+        "y_axis_label": "$x$",
+        'y_min': -5,
+        'y_max': 5,
+        "y_tick_frequency" : 1,
+        "y_labeled_nums" : list(range(-5, 6, 1)),
+        "y_axis_label" : "Posición $x$ (m)",
+        "graph_origin": 5 * LEFT,
+        'show_objects_list': [
+        #    'x_shadow', 
+            'x_line',
+        #    'x_vector',
+            'y_shadow',
+            'y_line',
+        #    'y_vector',
+        #    'r_line',
+        #    'r_vector',
+        #    'r_arc',
+        #    'r_arc_text'   
+            ],
+        'run_time': 10,
+    }
+    def X(self, t):
+        return X_v_const(t)
+    
+    def construct(self):
+        super().construct()
+        self.show_ecuacion_mov()
+        self.show_label_x0()
+        self.show_label_pendiente()
+        
+
+
+
+
+class XvsT_a_const(XvsT):
+    CONFIG = {
+        "x_axis_label": "$t$",
+        "x_min": 0,
+        "x_max": 10,
+        "x_labeled_nums" : list(range(1, 11)),
+        "x_axis_label" : "Tiempo $t$ (s)",
+        "y_axis_label": "$x$",
+        'y_min': -5,
+        'y_max': 5,
+        "y_tick_frequency" : 1,
+        "y_labeled_nums" : list(range(-5, 6, 1)),
+        "y_axis_label" : "Posición $x$ (m)",
+        "graph_origin": 5 * LEFT,
+        'show_objects_list': [
+        #    'x_shadow', 
+            'x_line',
+        #    'x_vector',
+            'y_shadow',
+            'y_line',
+        #    'y_vector',
+        #    'r_line',
+        #    'r_vector',
+        #    'r_arc',
+        #    'r_arc_text'   
+            ],
+        'run_time': 10,
+    }
+    def X(self, t):
+        return X_a_const(t)
+    
+    def construct(self):
+        super().construct()
+        self.show_ecuacion_mov(titulo='Movimiento con aceleración constante $a$',
+                                text='$x(t)=\\frac{1}{2} a t^2 + v_0 t + x_0$')
+        self.fun_graph=self.get_graph(lambda t: self.X(t/10.0))
+        self.show_label_x0(text_shift=1.01 * RIGHT+ 0.0 * UP)
+        self.show_linea_tangente(t=0, dt_left=-0.5, dt_right=3.0)
+        self.show_label_pendiente(text='pendiente inicial $v_0$', t=0, 
+                                  text_shift = 3 * RIGHT + 2 * DOWN,
+                                  arrow_start = 1.0 * RIGHT + 2.0 * DOWN,
+                                  arrow_end = 0.0 * DOWN)
+        
+
+        
 
 
 class SecantLineToTangentLine(GraphScene):
