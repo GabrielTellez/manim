@@ -130,6 +130,7 @@ class movimiento1D_cubico_vert(movimiento1D):
         "x_axis_width": 0,
         "x_axis_label": "",
         "type": "vertical",
+        "show_title": False,
     }
     def X(self, t):
         return Xcub(t)
