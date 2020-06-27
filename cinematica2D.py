@@ -5,6 +5,7 @@ VELOCITY_COLOR = GREEN
 TIME_COLOR= YELLOW
 DISTANCE_COLOR= BLUE
 ACCELERATION_COLOR = RED
+TITLE_COLOR = RED
 
 
 
@@ -27,6 +28,8 @@ class movimiento2D(GraphScene):
         "exclude_zero_label": True,
         "graph_origin": (0,0,0),
         "title": "Movimiento en dos dimensiones",
+        "title_position": ORIGIN + 3.725 * UP,
+        "title_color": TITLE_COLOR,
         "show_title": True, 
         "show_x_axis": True,
         "show_y_axis": True,
@@ -65,7 +68,11 @@ class movimiento2D(GraphScene):
         ax=derivative(self.X,t,dx=0.001,n=2)
         ay=derivative(self.Y,t,dx=0.001,n=2)
         return self.coords_to_point(ax,ay)
-    def mostrar_titulo(self, color = RED, pos=ORIGIN + 3.8 * UP):
+    def mostrar_titulo(self, color = None, pos = None):
+        if color == None:
+            color = self.title_color
+        if pos == None:
+            pos = self.title_position
         titulo_mobj=TextMobject(self.title, color = color).shift(pos)
         self.play(Write(titulo_mobj))
     def cinematic_vector(self, t, f=None, color=VELOCITY_COLOR, pos = None, scale=1.0, label_text = None, direction = None):
@@ -165,6 +172,7 @@ class movimiento1D(movimiento2D):
         "exclude_zero_label": False,
         "graph_origin": (0,0,0),
         "title": "Movimiento en una dimensión",
+        "title_position": ORIGIN + 2.5 * UP,
         "show_title": True, 
         "show_x_axis": True,
         "show_y_axis": False,
@@ -175,8 +183,8 @@ class movimiento1D(movimiento2D):
         "acc_scale": 1.0,
         "vel_label": "$\\vec{v}$",
         "acc_label": "$\\vec{a}$",
-        "vel_label_dir": UP,
-        "acc_label_dir": DOWN,
+        "vel_label_dir": 1.5 * UP,
+        "acc_label_dir": 2.5 * DOWN,
     }
     def Y(self,t):
         return 0.0
@@ -189,6 +197,12 @@ class mov_1D_cub(movimiento1D):
     def X(self,t):
         ts=t*0.55
         return 2*(0.3*ts**3-2.0*ts**2+3.0*ts)
+class mov_1D_cub_notraces(mov_1D_cub):
+    CONFIG = {
+        "show_path": False,
+        "show_velocity": False,
+        "show_acceleration": False,
+    }
 
 class mov_1D_v_const(movimiento1D):
     CONFIG = {
@@ -198,7 +212,7 @@ class mov_1D_v_const(movimiento1D):
         "initial_time": 0.0,
         "run_time": 10.0,
         "vel_scale": 2.0,
-         "vel_label_dir": UP + RIGHT,
+        "vel_label_dir": UP + RIGHT,
     }
     def X(self,t):
         return 0.8*t-4.5
