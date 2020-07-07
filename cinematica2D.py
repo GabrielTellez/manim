@@ -11,7 +11,7 @@ TITLE_COLOR = RED
 
 class movimiento2D(GraphScene):
     """
-    Anima un movimeinto en 2D, mostrando vectores velocidad (show_velocity=True)
+    Anima un movimiento en 2D, mostrando vectores velocidad (show_velocity=True)
     y aceleración (show_acceleration=True)
     """
     CONFIG = {
@@ -20,12 +20,14 @@ class movimiento2D(GraphScene):
         "x_tick_frequency": 1.0,
         "x_labeled_nums" : list(range(-5, 6, 1)),
         "x_axis_label" : "$x$ (m)",
+        "x_axis_width": 6,
         "y_min": -5,
         "y_max": 5,
         "y_tick_frequency": 1.0,
         "y_labeled_nums" : list(range(-5, 6, 1)),
         "y_axis_label" : "$y$ (m)",
         "exclude_zero_label": True,
+        "y_axis_height": 6,
         "graph_origin": (0,0,0),
         "title": "Movimiento en dos dimensiones",
         "title_position": ORIGIN + 3.725 * UP,
@@ -105,6 +107,41 @@ class movimiento2D(GraphScene):
             vec= VGroup(vec,text)
         return vec
 
+    def acc_component_vecs(
+        self, t, 
+        label_text_ac = "$\\vec{a}_c$", 
+        label_dir_ac = 1.5 * DOWN,
+        label_text_at= "$\\vec{a}_t$", 
+        label_dir_at = 4.0 * UP + 2.0 * RIGHT,
+        color = ACCELERATION_COLOR):
+        """Creates the vector components of the acceleration (centripetal, tangential)
+
+        Args:
+            t (float): time
+            label_text_ac (str, optional): label for centripetal acceleration. Defaults to "$\vec{a}_c$".
+            label_dir_ac (optional): offset for the a_c label. Defaults to 1.5*DOWN.
+            label_text_at (str, optional): label for the tangential acceleration. Defaults to "$\vec{a}_t$".
+            label_dir_at (optional): offset for the a_t label. Defaults to 4.0*UP+2.0*RIGHT.
+            color (optional): color for the vectors and label. Defaults to ACCELERATION_COLOR.
+
+        Returns:
+            [type]: [description]
+        """
+        (a_c, a_t) = self.acc_components(t)
+        pos = self.position(t)
+        a_c_vec = Vector(self.acc_scale*self.coords_to_point(a_c[0],a_c[1]), color = color)
+        a_c_vec.shift(pos)
+        a_t_vec = Vector(self.acc_scale*self.coords_to_point(a_t[0],a_t[1]), color = color)
+        a_t_vec.shift(pos)
+        components_list = []
+        for vec, label_text, direction in [(a_c_vec, label_text_ac, label_dir_ac), (a_t_vec, label_text_at, label_dir_at)]:
+            if label_text != None:
+                text=TextMobject(label_text, color = color)
+                text.next_to(pos, direction = direction)
+                vec = VGroup(vec,text)
+                components_list.append(vec)
+        return components_list
+
     def animate_graph(self):
         point = Dot(self.position(self.initial_time), color = DISTANCE_COLOR, radius=0.2)
         group = VGroup(point)
@@ -142,9 +179,10 @@ class movimiento2D(GraphScene):
                                                                 scale=self.acc_scale,  label_text=self.acc_label,
                                                                 direction = self.acc_label_dir ))
         group.add_updater(update_points)
-        self.play(current_time.set_value, self.initial_time + self.run_time, run_time=self.run_time , rate_func=linear)
+        self.play(current_time.set_value, self.initial_time + self.run_time, run_time=self.run_time, rate_func=linear)
+        return group
 
-    def construct(self):
+    def initialize_scene(self):
         if self.show_title:
             self.mostrar_titulo()
         self.setup_axes()
@@ -152,8 +190,10 @@ class movimiento2D(GraphScene):
             self.remove(self.x_axis_label, self.x_axis)
         if not self.show_y_axis:
             self.remove(self.y_axis_label, self.y_axis)
-        self.animate_graph()
 
+    def construct(self):
+        self.initialize_scene()
+        self.animate_graph()
         self.wait()
        
 
@@ -164,6 +204,7 @@ class movimiento1D(movimiento2D):
         "x_tick_frequency": 1.0,
         "x_labeled_nums" : list(range(-5, 6, 1)),
         "x_axis_label" : "$x$ (m)",
+        "x_axis_width": 9,
         "y_min": -5,
         "y_max": 5,
         "y_tick_frequency": 1.0,
@@ -264,3 +305,263 @@ class mov_caida_libre_slow_mo(mov_caida_libre):
         t=t/10.0
         y=(a/2.0)*t**2+vy0*t+y0
         return y
+
+
+class mov_circulos_alternos(movimiento2D):
+    CONFIG = {
+        "run_time" : 10.0,
+        "omega": 1.0,
+        "amp_x": 3.5,
+        "amp_y": 3.5,
+        "vel_scale": 0.5,
+        "acc_scale": 0.5,
+    }
+    def X(self, t):
+        x0 = - self.amp_x/2
+        if t < PI/self.omega:
+            x = x0 - self.amp_x * np.cos(self.omega*t)
+        else:
+            x =  x0 + 2 * self.amp_x - self.amp_x * np.cos(self.omega*t-PI)
+        return x
+    def Y(self,t):
+        y= self.amp_y*np.sin(self.omega*t)
+        return y
+
+class mov_circular_uniforme(movimiento2D):
+    """Anima un movimiento circular uniforme con velocidad angular omega."""
+    CONFIG = {
+        'amplitud': 5.0,
+        'omega': 2.0,
+        'vueltas': 2.0,
+        'phi': 0.0,
+        'run_time': None,
+        'title': 'Movimiento circular uniforme',
+    }
+
+    def construct(self):
+        if self.run_time == None:
+            """Determina run_time con el numero de vueltas"""
+            self.run_time = self.vueltas * TAU / self.omega
+        return super().construct()
+
+    def theta(self, t):
+        return self.omega*t + self.phi
+
+    def X(self,t):
+        return self.amplitud * np.cos(self.theta(t))
+
+    def Y(self,t):
+        return self.amplitud * np.sin(self.theta(t))
+
+class mov_circular_no_uniforme(mov_circular_uniforme):
+    """Anima un movimiento circular no uniforme, con aceleración angular alpha constante"""
+    CONFIG = {
+        'amplitud': 5.0,
+        'alpha': 0.5,
+        'omega': 0.0,
+        'phi': 0.0,
+        'run_time': 6.0,
+        'title': 'Movimiento circular no uniforme'
+    }
+
+    def theta(self, t):
+        return (self.alpha/2.0) * t**2 + self.omega*t + self.phi
+
+class mov_curvo_acel(mov_circular_no_uniforme):
+    CONFIG = {
+        'amplitud': 5.0,
+        'alpha': -0.035,   #   -0.035
+        'omega': -0.35,     #   -0.4
+        'phi': PI,
+        'run_time': 5.0,
+        'time_rescale': 0.7,
+        "vel_scale": 1.0,
+        "acc_scale": 3.0,
+        "vel_label_dir": 2 * UP +  LEFT,
+        "acc_label_dir": 8.0 * RIGHT,
+        'title': '',
+        'show_title': False,
+        "show_x_axis": False,
+        "show_y_axis": False,
+        "show_path": True,
+        "show_velocity": True,
+        "show_acceleration": False,
+    }
+    def X(self,t):
+        xfactor = 2.4
+        x0 = 4.0
+        return x0 + xfactor * self.amplitud * np.cos(self.theta(self.time_rescale*t))
+    def Y(self,t):
+        y0 = - 1.5
+        return y0 + self.amplitud * np.sin(self.theta(self.time_rescale*t))
+        
+class mov_curvo_acel_show_a(mov_curvo_acel):
+    CONFIG = {
+        "show_acceleration": True,
+    }
+
+class mov_curvo_acel_construction(mov_curvo_acel):
+    CONFIG = {
+        "dt": 1.0
+    }
+    def dv(self, t, dt = None):
+        if dt == None:
+            dt = self.dt
+        return self.velocity(t+dt) - self.velocity(t)
+
+    def animate_acceleration_construction(
+        self, 
+        t = 2.0,    # t =1.5, 2.0 
+        dt = None, 
+        v_t_label_txt = '$\\vec{v}(t)$',
+        v_t_label_dir = None,
+        v_t_dt_label_txt = '$\\vec{v}(t+\\Delta t)$',
+        v_t_dt_label_dir = 0.5 * DOWN + 1.5 * RIGHT,
+        dv_label_txt = '$\\Delta \\vec{v}$',
+        dv_label_dir = UP + 0.5 * RIGHT,
+        a_label_txt = '$$\\vec{a}_{\\text{med}}=\\frac{\\Delta \\vec{v}}{\\Delta t}$$',
+        a_label_dir = 3.0* DOWN + 0.5 * RIGHT,
+        a_scale = None,
+        continue_path = True):
+        """Animates the construction of the average acceleration."""
+
+        if dt == None:
+            dt = self.dt
+        if v_t_label_dir == None:
+            v_t_label_dir = self.vel_label
+        if a_scale == None:
+            a_scale = self.acc_scale
+        original_run_time = self.run_time
+        original_initial_time = self.initial_time
+        self.run_time = t
+        group = self.animate_graph()
+        point, path, v = group
+        t = self.run_time
+        v_t, label_t = self.cinematic_vector(t, scale=self.vel_scale, label_text= v_t_label_txt)
+        self.remove(v)
+        self.play(
+            Write(v_t),
+            Write(label_t)
+            )
+        self.wait()
+        self.initial_time = self.run_time
+        self.run_time = dt
+        group = self.animate_graph()
+        point, path, v = group
+        v_t_dt, label_t_dt = self.cinematic_vector(t+dt , scale=self.vel_scale, label_text=v_t_dt_label_txt, direction = v_t_dt_label_dir)
+        self.remove(v)
+        self.play(
+            Write(v_t_dt),
+            Write(label_t_dt)
+            )
+        self.wait()
+        self.play(ApplyMethod(v_t_dt.shift, self.position(t)-self.position(t+dt)))
+        self.remove(point, path)
+        dv = self.cinematic_vector(
+            t, f=self.dv, 
+            scale = self.vel_scale, 
+            label_text = dv_label_txt, color = ACCELERATION_COLOR,
+            direction = dv_label_dir
+        )
+        dv.shift(self.vel_scale*self.velocity(t))
+        self.play(ShowCreation(dv))
+        self.wait()
+        a = self.cinematic_vector(
+            t, f=self.dv, 
+            scale = a_scale * self.vel_scale, 
+            label_text = a_label_txt,
+            color = ACCELERATION_COLOR,
+            direction = a_label_dir
+        )
+        self.play(Transform(dv, a))
+        self.wait()
+        if continue_path:
+            self.remove(v_t_dt, label_t_dt)
+            self.initial_time = t
+            self.run_time = original_run_time - t
+            self.animate_graph()
+
+    def tangent_vec(self,t):
+        vx=derivative(self.X,t,dx=0.001)
+        vy=derivative(self.Y,t,dx=0.001)
+        norm = np.sqrt(vx**2 + vy**2)
+        ux = vx / norm
+        uy = vy / norm
+        return [ux, uy]
+    def tangent_unit_vec(self,t, color = GREY):
+        [ux, uy] = self.tangent_vec(t)
+        return self.coords_to_point(ux, uy)
+
+    def perp_vec(self,t):
+        [ux, uy] = self.tangent_vec(t)
+        return [uy, -ux]
+    def perp_unit_vec(self,t):
+        [ux, uy] = self.perp_vec(t)
+        return self.coords_to_point(ux, uy)
+
+    def acc_components(self, t):
+        """Gives the centripetal and tangential components of the acceleration
+
+        Args:
+            t (float): time
+
+        Returns: (np.array[ax_cen, ay_cen], np.array[ax_tan, ay_tan])
+        """
+
+        ax=derivative(self.X,t,dx=0.001,n=2)
+        ay=derivative(self.Y,t,dx=0.001,n=2)
+        a = np.array([ax, ay])
+        t_vec = np.array(self.tangent_vec(t))
+        c_vec = np.array(self.perp_vec(t))
+        a_t = np.dot(a,t_vec) * t_vec
+        a_c = np.dot(a,c_vec) * c_vec
+        return (a_c, a_t)
+
+    def perp_velocity(self,t):
+        vx=derivative(self.X,t,dx=0.001)
+        vy=derivative(self.Y,t,dx=0.001)
+        return self.coords_to_point(vy,-vx)
+
+    def animate_a_tangent_a_centripetal(
+        self, 
+        t = 2.0,    # t =1.5, 2.0 
+        a_sum_text = "$\\vec{a} = \\vec{a}_c + \\vec{a}_t$",
+        continue_path = True):
+        """Shows the centripetal and tangent components of acceleration."""
+
+        original_run_time = self.run_time
+        original_initial_time = self.initial_time
+        self.run_time = t
+        self.show_velocity = True
+        self.show_acceleration = True
+        group = self.animate_graph()
+        point, path, v_vec, a_vec = group
+        tg = self.tangent_unit_vec(t)
+        perp = self.perp_unit_vec(t)
+        pos = self.position(t)
+        tangent_line = Line(pos - 5.0 * tg, pos + 5.0 * tg , color = GREY)
+        perp_line = Line( pos , pos + 5.0 * perp, color = GREY )
+        self.play(
+            ShowCreation(tangent_line),
+            ShowCreation(perp_line)
+            )
+        [a_c_vec, a_t_vec] = self.acc_component_vecs(t)
+        self.play(
+            ShowCreation(a_c_vec),
+            ShowCreation(a_t_vec)
+            )
+        a_vec, a_txt = a_vec
+        a_decomp_txt = TextMobject(a_sum_text, color = ACCELERATION_COLOR)
+        a_decomp_txt.next_to(pos, direction = self.acc_label_dir)
+        self.remove(a_txt)
+        self.play(Write(a_decomp_txt))
+        
+
+        
+    def construct(self):
+        self.initialize_scene()
+        # self.animate_acceleration_construction()
+        # self.wait()
+        self.animate_a_tangent_a_centripetal()
+       
+        
