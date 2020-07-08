@@ -59,17 +59,42 @@ class movimiento2D(GraphScene):
         y=(a/2.0)*t**2+vy0*t+y0
         return y
     def position(self,t):
+        """Position at time t in Scene units
+
+        Args:
+            t (float): time
+
+        Returns:
+            np.array: position in Scene coordinates
+        """
         x=self.X(t)
         y=self.Y(t)
         return self.coords_to_point(x,y)
     def velocity(self,t):
+        """Velocity at time t in Scene coordinates
+
+        Args:
+            t (float): time
+
+        Returns:
+            np.array: Velocity components in Scene coordinates
+        """
         vx=derivative(self.X,t,dx=0.001)
         vy=derivative(self.Y,t,dx=0.001)
         return self.coords_to_point(vx,vy)
     def acceleration(self,t):
+        """Acceleration at time t in Scene coordinates
+
+        Args:
+            t (float): time
+
+        Returns:
+            np.array: Acceleration cartesian coordiantes in Scene coordiantes
+        """
         ax=derivative(self.X,t,dx=0.001,n=2)
         ay=derivative(self.Y,t,dx=0.001,n=2)
         return self.coords_to_point(ax,ay)
+
     def mostrar_titulo(self, color = None, pos = None):
         if color == None:
             color = self.title_color
@@ -77,6 +102,7 @@ class movimiento2D(GraphScene):
             pos = self.title_position
         titulo_mobj=TextMobject(self.title, color = color).shift(pos)
         self.play(Write(titulo_mobj))
+    
     def cinematic_vector(self, t, f=None, color=VELOCITY_COLOR, pos = None, scale=1.0, label_text = None, direction = None):
         """
         Creates velocity or acceleration vector
@@ -107,6 +133,83 @@ class movimiento2D(GraphScene):
             vec= VGroup(vec,text)
         return vec
 
+    def position_vec(self, t):
+        """Position vector in Graph units
+
+        Args:
+            t (float): time
+
+        Returns:
+            np.array([x,y]): Position in Graph units
+        """
+        x=self.X(t)
+        y=self.Y(t)
+        return np.array([x,y])
+
+    def velocity_vec(self,t):
+        """Velocity at time t in Graph units
+
+        Args:
+            t (float): time
+
+        Returns:
+            np.array: Cartesian components of velocity in Graph units
+        """
+        vx=derivative(self.X,t,dx=0.001)
+        vy=derivative(self.Y,t,dx=0.001)
+        return np.array([vx,vy])
+
+    def acceleration_vec(self,t):
+        """Acceleration at time t in Graph units
+
+        Args:
+            t (float): time
+
+        Returns:
+            nd.array: Cartesian components of acceleration in Graph units
+        """
+        ax=derivative(self.X,t,dx=0.001,n=2)
+        ay=derivative(self.Y,t,dx=0.001,n=2)
+        return np.array([ax, ay])
+
+    def tangent_vec(self,t):
+        vx=derivative(self.X,t,dx=0.001)
+        vy=derivative(self.Y,t,dx=0.001)
+        norm = np.sqrt(vx**2 + vy**2)
+        ux = vx / norm
+        uy = vy / norm
+        return np.array([ux, uy])
+
+    def tangent_unit_vec(self,t, color = GREY):
+        [ux, uy] = self.tangent_vec(t)
+        return self.coords_to_point(ux, uy)
+
+    def perp_vec(self,t):
+        [ux, uy] = self.tangent_vec(t)
+        perp_vec = np.array([uy, -ux])
+        if np.dot(perp_vec, self.acceleration_vec(t)) < 0:
+            perp_vec = - perp_vec
+        return perp_vec
+
+    def perp_unit_vec(self,t):
+        [ux, uy] = self.perp_vec(t)
+        return self.coords_to_point(ux, uy)
+
+    def acc_components(self, t):
+        """Gives the centripetal and tangential components of the acceleration in Graph units
+
+        Args:
+            t (float): time
+
+        Returns: (np.array[ax_cen, ay_cen], np.array[ax_tan, ay_tan])
+        """
+        a = self.acceleration_vec(t)
+        t_vec = np.array(self.tangent_vec(t))
+        c_vec = np.array(self.perp_vec(t))
+        a_t = np.dot(a,t_vec) * t_vec
+        a_c = np.dot(a,c_vec) * c_vec
+        return (a_c, a_t)
+
     def acc_component_vecs(
         self, t, 
         label_text_ac = "$\\vec{a}_c$", 
@@ -125,7 +228,7 @@ class movimiento2D(GraphScene):
             color (optional): color for the vectors and label. Defaults to ACCELERATION_COLOR.
 
         Returns:
-            [type]: [description]
+            list: [VGroup(a_centripetal, label), VGroup(a_tangential, label)]
         """
         (a_c, a_t) = self.acc_components(t)
         pos = self.position(t)
@@ -180,6 +283,47 @@ class movimiento2D(GraphScene):
                                                                 direction = self.acc_label_dir ))
         group.add_updater(update_points)
         self.play(current_time.set_value, self.initial_time + self.run_time, run_time=self.run_time, rate_func=linear)
+        return group
+
+    def run_trayectory_up_to_time(self, t):
+        """Runs the trayectory up to time t and pauses there."""
+        original_run_time = self.run_time
+        original_initial_time = self.initial_time
+        self.run_time = t - self.initial_time
+        group = self.animate_graph()
+        self.run_time = original_run_time 
+        self.initial_time = original_initial_time
+        return group
+    
+    def continue_trayectory_from(self, t):
+        """Continues to run the trayectory from time t to the end."""
+        original_run_time = self.run_time
+        original_initial_time = self.initial_time
+        self.initial_time = t
+        self.run_time = self.run_time - t
+        group = self.animate_graph()
+        self.run_time = original_run_time 
+        self.initial_time = original_initial_time
+        return group
+
+    def run_trayectory_from_to(self, t1, t2):
+        """Runs the trayectory from time t1 to time t2
+
+        Args:
+            t1 (float): initial time
+            t2 (float): end time
+        
+        Returns:
+            VGroup(point, [path, velocity, acceleration, ...]) of final
+            time t2
+        """
+        original_run_time = self.run_time
+        original_initial_time = self.initial_time
+        self.initial_time = t1
+        self.run_time = t2 - t1
+        group = self.animate_graph()
+        self.run_time = original_run_time 
+        self.initial_time = original_initial_time
         return group
 
     def initialize_scene(self):
@@ -386,6 +530,7 @@ class mov_curvo_acel(mov_circular_no_uniforme):
         "show_path": True,
         "show_velocity": True,
         "show_acceleration": False,
+        "t": 2.0,  # t =1.5, 2.0 tiempo para mostrar la animación
     }
     def X(self,t):
         xfactor = 2.4
@@ -401,8 +546,14 @@ class mov_curvo_acel_show_a(mov_curvo_acel):
     }
 
 class mov_curvo_acel_construction(mov_curvo_acel):
+    """ Escena que muestra la construcción gráfica de la aceleración promedio."""
     CONFIG = {
-        "dt": 1.0
+        "dt": 1.0,
+        "show_velocity": True,
+        "show_acceleration": False,
+        "show_path": True,
+        "title": "Construcción gráfica de la aceleración promedio",
+        "show_title": True,
     }
     def dv(self, t, dt = None):
         if dt == None:
@@ -411,7 +562,7 @@ class mov_curvo_acel_construction(mov_curvo_acel):
 
     def animate_acceleration_construction(
         self, 
-        t = 2.0,    # t =1.5, 2.0 
+        t = None,    
         dt = None, 
         v_t_label_txt = '$\\vec{v}(t)$',
         v_t_label_dir = None,
@@ -425,18 +576,16 @@ class mov_curvo_acel_construction(mov_curvo_acel):
         continue_path = True):
         """Animates the construction of the average acceleration."""
 
+        if t == None:
+            t=self.t
         if dt == None:
             dt = self.dt
         if v_t_label_dir == None:
             v_t_label_dir = self.vel_label
         if a_scale == None:
             a_scale = self.acc_scale
-        original_run_time = self.run_time
-        original_initial_time = self.initial_time
-        self.run_time = t
-        group = self.animate_graph()
-        point, path, v = group
-        t = self.run_time
+
+        point, path, v = self.run_trayectory_up_to_time(t)
         v_t, label_t = self.cinematic_vector(t, scale=self.vel_scale, label_text= v_t_label_txt)
         self.remove(v)
         self.play(
@@ -444,9 +593,7 @@ class mov_curvo_acel_construction(mov_curvo_acel):
             Write(label_t)
             )
         self.wait()
-        self.initial_time = self.run_time
-        self.run_time = dt
-        group = self.animate_graph()
+        group = self.run_trayectory_from_to(t,t+dt)
         point, path, v = group
         v_t_dt, label_t_dt = self.cinematic_vector(t+dt , scale=self.vel_scale, label_text=v_t_dt_label_txt, direction = v_t_dt_label_dir)
         self.remove(v)
@@ -477,91 +624,129 @@ class mov_curvo_acel_construction(mov_curvo_acel):
         self.wait()
         if continue_path:
             self.remove(v_t_dt, label_t_dt)
-            self.initial_time = t
-            self.run_time = original_run_time - t
-            self.animate_graph()
+            self.continue_trayectory_from(t)
+        
+    def construct(self):
+        self.initialize_scene()
+        self.animate_acceleration_construction()
+        self.wait()
 
-    def tangent_vec(self,t):
-        vx=derivative(self.X,t,dx=0.001)
-        vy=derivative(self.Y,t,dx=0.001)
-        norm = np.sqrt(vx**2 + vy**2)
-        ux = vx / norm
-        uy = vy / norm
-        return [ux, uy]
-    def tangent_unit_vec(self,t, color = GREY):
-        [ux, uy] = self.tangent_vec(t)
-        return self.coords_to_point(ux, uy)
+class mov_curvo_acel_components(mov_curvo_acel):
+    """Escena (Scene) de animación de las componentes tangencial y centripeta de la aceleración."""
+    CONFIG = {
+        "show_velocity": True,
+        "show_acceleration": True,
+        "show_path": True,
+        "title": "Componentes centripeta y tangencial de la aceleración",
+        "show_title": True,
+    }
+    def get_tangent_circle_center_and_radius_in_graph(self, t):
+        """Gets the center of the tangent circle position in Graph units."""
+        perp_vec = self.perp_vec(t)
+        v2 = np.linalg.norm(self.velocity_vec(t))**2
+        [ac, at] = self.acc_components(t)
+        ac_norm = np.linalg.norm(ac)
+        r = v2 / ac_norm
+        center_pos = self.position_vec(t) + r * perp_vec
+        return (center_pos, r)
 
-    def perp_vec(self,t):
-        [ux, uy] = self.tangent_vec(t)
-        return [uy, -ux]
-    def perp_unit_vec(self,t):
-        [ux, uy] = self.perp_vec(t)
-        return self.coords_to_point(ux, uy)
+    def get_tangent_circle_center_and_radius_in_scene(self, t):
+        """Gets the center of the tangent circle position in Scene units."""
+        ([cx, cy], r) = self.get_tangent_circle_center_and_radius_in_graph(t)
+        center_pos_in_scene = self.coords_to_point(cx, cy)
+        r_in_scene = np.linalg.norm(self.coords_to_point(r,0))
+        return (center_pos_in_scene, r_in_scene)
 
-    def acc_components(self, t):
-        """Gives the centripetal and tangential components of the acceleration
+    def tangent_circle(self, t, color = GREY):
+        """Constructs the tangent circle to trayectory."""
+        # get center and radius in Scene
+        (center_pos_in_scene, r_in_scene) = self.get_tangent_circle_center_and_radius_in_scene(t)
+        tang_circle = Circle(radius = r_in_scene, color = color).shift(center_pos_in_scene)
+        return tang_circle, center_pos_in_scene, r_in_scene
+    
+    def animate_tangent_circle(self, t, color = GREY):
+        """Shows the tangent circle at time t.
 
         Args:
-            t (float): time
-
-        Returns: (np.array[ax_cen, ay_cen], np.array[ax_tan, ay_tan])
+            t (time): time
         """
+        tang_circle, center_pos_in_scene, r_in_scene = self.tangent_circle(t, color = color)
+        self.play(ShowCreation(tang_circle))
+        return tang_circle, center_pos_in_scene, r_in_scene
 
-        ax=derivative(self.X,t,dx=0.001,n=2)
-        ay=derivative(self.Y,t,dx=0.001,n=2)
-        a = np.array([ax, ay])
-        t_vec = np.array(self.tangent_vec(t))
-        c_vec = np.array(self.perp_vec(t))
-        a_t = np.dot(a,t_vec) * t_vec
-        a_c = np.dot(a,c_vec) * c_vec
-        return (a_c, a_t)
-
-    def perp_velocity(self,t):
-        vx=derivative(self.X,t,dx=0.001)
-        vy=derivative(self.Y,t,dx=0.001)
-        return self.coords_to_point(vy,-vx)
-
-    def animate_a_tangent_a_centripetal(
-        self, 
-        t = 2.0,    # t =1.5, 2.0 
-        a_sum_text = "$\\vec{a} = \\vec{a}_c + \\vec{a}_t$",
-        continue_path = True):
-        """Shows the centripetal and tangent components of acceleration."""
-
-        original_run_time = self.run_time
-        original_initial_time = self.initial_time
-        self.run_time = t
-        self.show_velocity = True
-        self.show_acceleration = True
-        group = self.animate_graph()
-        point, path, v_vec, a_vec = group
+    def tangent_perp_lines(self, t, r = None, color = GREY):
+        if r == None:
+            (center_pos_in_scene, r) = self.get_tangent_circle_center_and_radius_in_scene(t)
         tg = self.tangent_unit_vec(t)
         perp = self.perp_unit_vec(t)
         pos = self.position(t)
-        tangent_line = Line(pos - 5.0 * tg, pos + 5.0 * tg , color = GREY)
-        perp_line = Line( pos , pos + 5.0 * perp, color = GREY )
+        tangent_line = Line(pos - 5.0 * tg, pos + 5.0 * tg , color = color)
+        perp_line = Line( pos , center_pos_in_scene, color = color )
+        return tangent_line, perp_line
+
+    def animate_tangent_perp_lines(self, t):
+        tangent_line, perp_line = self.tangent_perp_lines(t)
         self.play(
             ShowCreation(tangent_line),
             ShowCreation(perp_line)
             )
+        return (tangent_line, perp_line)
+
+    def animate_acc_components(self,t):
+        """Animation showing the centripetal and tangential components of acceleration."""
         [a_c_vec, a_t_vec] = self.acc_component_vecs(t)
         self.play(
             ShowCreation(a_c_vec),
             ShowCreation(a_t_vec)
             )
+        return [a_c_vec, a_t_vec]
+
+    def animate_a_tangent_a_centripetal(
+        self, 
+        t,   
+        a_sum_text = "$\\vec{a} = \\vec{a}_c + \\vec{a}_t$",
+        r_label_dir = 6.0 * UP +  7.0 * LEFT,
+        continue_path = True):
+        """Shows the centripetal and tangent components of acceleration."""
+
+        point, path, v_vec, a_vec = self.run_trayectory_up_to_time(t)
+        self.animate_tangent_perp_lines(t)
+        (tg_circle, center, r) = self.animate_tangent_circle(t)
+        # texto r circulo tangente
+        r_text = TextMobject('$r$', color = GREY)
+        r_text.next_to(center, direction = r_label_dir)
+        self.play(Write(r_text))
+        self.wait()
+
+        self.remove(v_vec)
+        self.animate_acc_components(t)
+        
+        # texto a = ac + at
         a_vec, a_txt = a_vec
         a_decomp_txt = TextMobject(a_sum_text, color = ACCELERATION_COLOR)
+        pos = self.position(t)
         a_decomp_txt.next_to(pos, direction = self.acc_label_dir)
         self.remove(a_txt)
         self.play(Write(a_decomp_txt))
-        
+        self.wait()
 
-        
+        # texto ac = ... at = ...
+        ac_txt = TextMobject('$$a_c = \\frac{|\\vec{v}|^2}{r}$$', color = ACCELERATION_COLOR)
+        at_txt = TextMobject('$$a_t = \\frac{d|\\vec{v}|}{dt}$$', color =ACCELERATION_COLOR )
+        ac_txt.next_to(a_decomp_txt, direction = DOWN)
+        at_txt.next_to(ac_txt, direction = DOWN)
+        self.play(Write(ac_txt), Write(at_txt))
+
+
+
+        if continue_path == True:
+            self.acc_label_dir = DOWN + LEFT
+            self.continue_trayectory_from(t)
+
     def construct(self):
         self.initialize_scene()
-        # self.animate_acceleration_construction()
-        # self.wait()
-        self.animate_a_tangent_a_centripetal()
-       
+        t=self.t
+        self.animate_a_tangent_a_centripetal(t)
+        self.wait()
+        
         
